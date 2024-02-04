@@ -1,0 +1,291 @@
+CREATE DATABASE BookShop
+
+USE BookShop
+
+CREATE TABLE Authors
+(
+Authors_ID INTEGER IDENTITY PRIMARY KEY NOT NULL,
+Name NVARCHAR(MAX) NOT NULL,
+Surname NVARCHAR(MAX) NOT NULL,
+CountryId INTEGER REFERENCES Countries(Countries_ID) NOT NULL,
+)
+
+SELECT * FROM Authors
+
+DELETE FROM Authors
+
+INSERT INTO Authors VALUES
+('Фёдор', 'Достоевский', 1),
+('Дж.', 'Роулинг ', 2),
+('Михаил', 'Булгаков', 3),
+('Халед', 'Хоссейни ', 4),
+('Лев', 'Толстой', 1),
+('Михаил', 'Виткуп', 5)
+
+
+
+
+
+
+CREATE TABLE Books
+(
+Books_ID INTEGER IDENTITY PRIMARY KEY NOT NULL,
+Name NVARCHAR(MAX) NOT NULL,
+Pages INTEGER CHECK(Pages > 0),
+Price MONEY NOT NULL CHECK(Price >= 0),
+PublishDate DATE CHECK(PublishDate <= GETDATE())  NOT NULL,
+AuthorId INTEGER REFERENCES Authors(Authors_ID) NOT NULL,
+ThemeId INTEGER REFERENCES Themes(Themes_ID) NOT NULL,
+)
+SELECT * FROM Books
+
+INSERT INTO Books (Name, Pages, Price, PublishDate, AuthorId, ThemeId) VALUES
+('Преступление и наказание', 384, 100, '1866-07-15', 13, 1),
+('Гарри Поттер и философский камень', 780, 50, '1997-03-22', 14, 2),
+('Мастер и Маргарита', 685, 10, '1967-11-05', 15, 1),
+('Тысяча сияющих солнц', 314, 17, '2007-09-30', 16, 1),
+('Война и мир', 1320, 20, '1869-04-12', 17, 3),
+('Книга Microsoft Office в прикладах', 820, 15, '2007-06-18', 18, 4)
+
+
+
+
+
+CREATE TABLE Countries
+(
+Countries_ID INTEGER IDENTITY PRIMARY KEY NOT NULL,
+Name NVARCHAR(50) NOT NULL UNIQUE,
+)
+
+SELECT * FROM Countries
+
+INSERT INTO Countries VALUES
+('Россия'),
+('Великобритания'),
+('СССР'),
+('США'),
+('Украина')
+
+
+
+
+
+CREATE TABLE Sales
+(
+Sales_ID INTEGER IDENTITY PRIMARY KEY NOT NULL,
+Price MONEY CHECK(Price >= 0) NOT NULL,
+Quantity INTEGER CHECK(Quantity > 0) NOT NULL,
+SaleDate DATE DEFAULT GETDATE() NOT NULL,
+BookId INTEGER REFERENCES Books(Books_ID) NOT NULL,
+ShopId INTEGER REFERENCES Shops(Shops_ID) NOT NULL,
+)
+
+SELECT * FROM Sales
+
+INSERT INTO Sales (Price, Quantity, BookId, ShopId) VALUES
+( 100, 10, 19, 21),
+( 50, 15, 20, 21),
+( 10, 30, 21, 23),
+( 17, 16, 22, 24),
+( 20, 45, 23, 25),
+( 15, 31, 24, 25)
+
+
+
+
+CREATE TABLE Shops
+(
+Shops_ID INTEGER IDENTITY PRIMARY KEY NOT NULL,
+Name NVARCHAR(MAX) NOT NULL,
+CountryId INTEGER REFERENCES Countries(Countries_ID) NOT NULL,
+)
+
+SELECT * FROM Shops
+
+DELETE FROM Shops
+
+INSERT INTO Shops VALUES
+('Читай и Размахивай', 1),
+('Страницы Мудрости', 2),
+('Сказочный Мир Книг', 3),
+('Истории на полке', 4),
+('Истории в Обложках', 5)
+
+
+
+
+
+CREATE TABLE Themes
+(
+Themes_ID INTEGER IDENTITY PRIMARY KEY NOT NULL,
+Name NVARCHAR(100) UNIQUE NOT NULL,
+)
+
+SELECT * FROM Themes
+
+INSERT INTO Themes VALUES
+('Роман'),
+('Фэнтези'),
+('История'),
+('Обучение')
+
+
+--Показать все книги, количество страниц в которых больше
+--500, но меньше 650.
+SELECT * FROM Books
+WHERE Pages > 500 AND Pages < 650
+
+
+--Показать все книги, в которых первая буква названия либо
+--«А», либо «З».
+
+SELECT * FROM Books
+WHERE LEFT(Name, 1) IN ('А', 'З')
+
+--Показать все книги жанра «Детектив», количество проданных книг более 30 экземпляров.
+
+SELECT * FROM Books
+WHERE ThemeId = (SELECT Themes_ID FROM Themes WHERE Name = 'Детектив')
+AND Sales_ID IN (SELECT Sales_ID FROM Sales WHERE Quantity > 30)
+
+
+--Показать все книги, в названии которых есть слово «Microsoft», но нет слова «Windows».
+
+SELECT * FROM Books
+WHERE Name LIKE '%Microsoft%' AND Name NOT LIKE '%Windows%'
+
+
+--Показать все книги (название, тематика, полное имя автора
+--в одной ячейке), цена одной страницы которых меньше
+--65 копеек.
+
+SELECT 
+  CONCAT(Books.Name, ' - ', Themes.Name, ' - ', Authors.Name, ' - ',  Authors.Surname) AS BookInfo
+FROM Books
+JOIN Themes ON Books.ThemeId = Themes.Themes_ID
+JOIN Authors ON Books.AuthorId = Authors.Authors_ID
+WHERE (Price / Pages) < 0.65
+
+--Показать все книги, название которых состоит из 4 слов.
+
+SELECT * FROM Books
+WHERE LEN(Name) - LEN(REPLACE(Name, ' ', '')) = 3
+
+
+--Показать информацию о продажах в следующем виде:
+--▷ Название книги, но, чтобы оно не содержало букву «А».
+--▷ Тематика, но, чтобы не «Программирование».
+--▷ Автор, но, чтобы не «Герберт Шилдт».
+--▷ Цена, но, чтобы в диапазоне от 10 до 20 гривен.
+--▷ Количество продаж, но не менее 8 книг.
+--▷ Название магазина, который продал книгу, но он не
+--должен быть в Украине или России.
+
+  SELECT
+  REPLACE(b.Name, 'А', '') AS BookTitle,
+  t.Name AS Theme,
+  CONCAT(a.Name, ' ', a.Surname) AS Author,
+  s.Price AS Price,
+  s.Quantity AS SalesQuantity,
+  sh.Name AS Shop
+FROM Sales s
+JOIN Books b ON s.BookId = b.Books_ID
+JOIN Themes t ON b.ThemeId = t.Themes_ID
+JOIN Authors a ON b.AuthorId = a.Authors_ID
+JOIN Shops sh ON s.ShopId = sh.Shops_ID
+WHERE 
+  b.Name NOT LIKE '%А%'
+  AND t.Name != 'Программирование'
+  AND CONCAT(a.Name, ' ', a.Surname) != 'Герберт Шилдт'
+  AND s.Price >= 10 AND s.Price <= 20
+  AND s.Quantity >= 8
+  AND sh.CountryId NOT IN (SELECT Countries_ID FROM Countries WHERE Name IN ('Украина', 'Россия'))
+
+
+
+--  Показать следующую информацию в два столбца (числа
+--в правом столбце приведены в качестве примера):
+--▷ Количество авторов: 14
+--▷ Количество книг: 47
+--▷ Средняя цена продажи: 85.43 грн.
+--▷ Среднее количество страниц: 650.6.
+
+-- Количество авторов
+SELECT 'Количество авторов' AS Metric, COUNT(*) AS Value FROM Authors
+UNION ALL
+-- Количество книг
+SELECT 'Количество книг', COUNT(*) FROM Books
+UNION ALL
+-- Средняя цена продажи
+SELECT 'Средняя цена продажи', AVG(Price) FROM Sales
+UNION ALL
+-- Среднее количество страниц
+SELECT 'Среднее количество страниц', AVG(Pages) FROM Books
+
+--Показать тематики книг и сумму страниц всех книг по
+--каждой из них.
+
+SELECT t.Name AS Theme, SUM(b.Pages) AS TotalPages
+FROM Themes t
+LEFT JOIN Books b ON t.Themes_ID = b.ThemeId
+GROUP BY t.Name
+
+--. Показать количество всех книг и сумму страниц этих книг
+--по каждому из авторов.
+
+SELECT CONCAT(a.Name, ' ', a.Surname) AS AuthorName, COUNT(b.Books_ID) AS BookCount, SUM(b.Pages) AS TotalPages
+FROM Authors a
+LEFT JOIN Books b ON a.Authors_ID = b.AuthorId
+GROUP BY CONCAT(a.Name, ' ', a.Surname)
+
+--Показать книгу тематики «Программирование» с наибольшим количеством страниц.
+
+SELECT TOP 1
+  b.Name AS BookName,
+  b.Pages AS PagesCount
+FROM Books b
+WHERE b.ThemeId = (SELECT Themes_ID FROM Themes WHERE Name = 'Программирование')
+ORDER BY b.Pages DESC
+
+--Показать среднее количество страниц по каждой тематике,
+--которое не превышает 400.
+
+SELECT t.Name AS Theme, AVG(b.Pages) AS AvgPages
+FROM Themes t
+LEFT JOIN Books b ON t.Themes_ID = b.ThemeId
+GROUP BY t.Name
+HAVING AVG(b.Pages) <= 400
+
+--Показать сумму страниц по каждой тематике, учитывая
+--только книги с количеством страниц более 400, и чтобы
+--тематики были «Программирование», «Администрирование» и «Дизайн».
+
+SELECT t.Name AS Theme, SUM(b.Pages) AS TotalPages
+FROM Themes t
+LEFT JOIN Books b ON t.Themes_ID = b.ThemeId
+WHERE t.Name IN ('Программирование', 'Администрирование', 'Дизайн')
+  AND b.Pages > 400
+GROUP BY t.Name
+
+--Показать информацию о работе магазинов: что, где, кем,
+--когда и в каком количестве было продано.
+
+SELECT
+  b.Name AS BookTitle,
+  sh.Name AS ShopName,
+  s.Price AS Price,
+  s.Quantity AS SalesQuantity,
+  s.SaleDate AS SaleDate
+FROM Sales s
+JOIN Books b ON s.BookId = b.Books_ID
+JOIN Shops sh ON s.ShopId = sh.Shops_ID
+
+--Показать самый прибыльный магазин.
+
+SELECT TOP 1
+  sh.Name AS ShopName,
+  SUM(s.Price * s.Quantity) AS TotalProfit
+FROM Sales s
+JOIN Shops sh ON s.ShopId = sh.Shops_ID
+GROUP BY sh.Name
+ORDER BY TotalProfit DESC
